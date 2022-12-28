@@ -21,9 +21,9 @@ time as a result.
 
 ## Building
 
-Move the Linux 386 binaries from the `bin` folder of the above Cowgol fork
-into this folder. Change the RT_LOCATION variable in the makefile to something
-like `cowgol_fork/.obj/rt`. Finally, run `make`.
+Download this repository as well as the Cowgol fork.
+Change the `COWGOL_LOC` variable in the makefile to something like
+`/path/to/cowgol_fork/`. Run `make`.
 
 ## Usage
 
