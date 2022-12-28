@@ -1,0 +1,75 @@
+#A dynamically-sized string. Does not rely on null-termination.
+record tDString is
+	buffer: [uint8];
+	capacity: intptr;
+	length: intptr;
+end record;
+
+sub ReAlloc(p: [uint8], lOld: intptr, lNew: intptr): (newP: [uint8]) is
+	if p != 0 and lNew > lOld then
+		newP := Alloc(lNew);
+		MemCopy(p, lOld, newP);
+		Free(p);
+	end if;
+end sub;
+
+sub newDS(): (x: [tDString]) is
+	x := Alloc(@bytesof tDString) as [tDString];
+	x.buffer := Alloc(8);
+	x.capacity := 8;
+	x.length := 0;
+	[x.buffer] := 0;
+end sub;
+
+sub freeDS(x: [tDString]) is
+	if x != 0 then
+		Free(x.buffer);
+		Free(x as [uint8]);
+	end if;
+end sub;
+
+sub pushDS(x: [tDString], c: uint8) is
+	var capacity := x.capacity;
+	if x.length + 2 > capacity then
+		var newCapacity := capacity + capacity / 2;
+		x.buffer := ReAlloc(x.buffer, capacity, newCapacity);
+		x.capacity := newCapacity;
+	end if;
+	[x.buffer + x.length] := c;
+	var newLength := x.length + 1;
+	[x.buffer + newLength] := 0;
+	x.length := newLength;
+end sub;
+
+#Truncates a string. The part of the string from startI (inclusive)
+# to endI (exclusive) is removed.
+sub truncDS(x: [tDString], startI: intptr, endI: intptr) is
+	var lastI := x.length - 1;
+	if startI > lastI then
+		startI := lastI;
+	end if;
+	if endI > lastI then
+		endI := lastI;
+	end if;
+	var sliceLength := endI - startI;
+	if endI as int32 - startI as int32 > 0 then
+		if endI < lastI then
+			var i: intptr := endI;
+			var j: intptr := startI;
+			while i <= lastI loop;
+				[x.buffer + j] := [x.buffer + i];
+				j := j + 1;
+				i := i + 1;
+			end loop;
+			[x.buffer + j] := 0;
+		end if;
+		x.length := x.length - sliceLength;
+	end if;
+end sub;
+
+sub popDS(x: [tDString]): (c: uint8) is
+	var newLength := x.length - 1;
+	c := [x.buffer + newLength];
+	[x.buffer + newLength] := 0;
+	x.length := newLength;
+end sub;

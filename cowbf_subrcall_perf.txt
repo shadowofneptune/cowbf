@@ -1,0 +1,14 @@
+Performance counter stats for './cowbf_subrcall test.bf accelerando.txt' (100 runs):
+
+         16,941.88 msec task-clock                #    0.997 CPUs utilized            ( +-  0.06% )
+             1,493      context-switches          #    0.088 K/sec                    ( +-  3.09% )
+               109      cpu-migrations            #    0.006 K/sec                    ( +-  6.27% )
+                12      page-faults               #    0.001 K/sec                    ( +-  0.21% )
+    55,667,798,943      cycles                    #    3.286 GHz                      ( +-  0.06% )
+    19,851,374,980      stalled-cycles-frontend   #   35.66% frontend cycles idle     ( +-  0.10% )
+    60,348,554,050      instructions              #    1.08  insn per cycle         
+                                                  #    0.33  stalled cycles per insn  ( +-  0.01% )
+    11,759,984,984      branches                  #  694.137 M/sec                    ( +-  0.00% )
+       633,457,975      branch-misses             #    5.39% of all branches          ( +-  0.02% )
+
+           16.9954 +- 0.0120 seconds time elapsed  ( +-  0.07% )

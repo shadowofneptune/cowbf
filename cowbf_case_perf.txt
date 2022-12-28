@@ -1,0 +1,14 @@
+Performance counter stats for './cowbf_case test.bf accelerando.txt' (100 runs):
+
+         13,682.22 msec task-clock                #    0.996 CPUs utilized            ( +-  0.03% )
+             1,438      context-switches          #    0.105 K/sec                    ( +-  0.99% )
+               100      cpu-migrations            #    0.007 K/sec                    ( +-  5.54% )
+                12      page-faults               #    0.001 K/sec                    ( +-  0.27% )
+    44,942,265,633      cycles                    #    3.285 GHz                      ( +-  0.01% )
+    20,879,557,603      stalled-cycles-frontend   #   46.46% frontend cycles idle     ( +-  0.03% )
+    66,957,742,974      instructions              #    1.49  insn per cycle         
+                                                  #    0.31  stalled cycles per insn  ( +-  0.00% )
+    19,694,245,302      branches                  # 1439.404 M/sec                    ( +-  0.00% )
+        28,342,948      branch-misses             #    0.14% of all branches          ( +-  0.03% )
+
+          13.73408 +- 0.00472 seconds time elapsed  ( +-  0.03% )

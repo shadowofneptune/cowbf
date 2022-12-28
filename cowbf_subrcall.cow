@@ -1,0 +1,242 @@
+#A Brainfuck interpreter.
+include "cowgol.coh";
+include "argv.coh";
+include "strings.coh";
+include "malloc.coh";
+include "file.coh";
+include "tdstr.coh";
+const DATA_SIZE := 30000;
+const I_BRK := 0;
+const I_INCP := @bytesof intptr;
+const I_DECP := 2 * @bytesof intptr;
+const I_INCD := 3 * @bytesof intptr;
+const I_DECD := 4 * @bytesof intptr;
+const I_OUT := 5 * @bytesof intptr;
+const I_IN := 6 * @bytesof intptr;
+const I_JMPF := 7 * @bytesof intptr;
+const I_JMPB := 8 * @bytesof intptr;
+
+var dataSpace: [uint8];
+var codeSpace: [tDString];
+var instrP: [uint8];
+var dataP: [uint8];
+var input: FCB;
+var inputLength: intptr;
+
+#Upon loading the file, the interpreter changes the input into a more easily
+#interpreted format:
+#	- No-op characters are removed.
+#	- jump instructions are changed to the format:
+#		[opcode (1 byte)][jump destination (pointer width bytes)]
+#	- opcodes are converted into a jump-table ready format.
+sub openFiles(): (programFile: [FCB]) is
+	ArgvInit();
+	var usage := "Usage: [program file] [input file]\n";
+
+	var name := ArgvNext();
+	if name == 0 or [name] == 0 then
+		print(usage);
+		ExitWithError();
+	end if;
+	programFile := Alloc(@bytesof FCB) as [FCB];
+	if FCBOpenIn(programFile, name) != 0 then
+		print("Failed to open program.\n");
+		ExitWithError();
+	end if;
+
+	name := ArgvNext();
+	if name == 0 or [name] == 0 then
+		print(usage);
+		ExitWithError();
+	end if;
+	if FCBOpenIn(&input, name) != 0 then
+		print("Failed to open input.\n");
+		ExitWithError();
+	end if;
+	inputLength := FCBExt(&input);
+end sub;
+
+sub loadProgram() is
+	dataSpace := Alloc(DATA_SIZE);
+	codeSpace := newDS();
+	dataP := dataSpace;
+	var sp := dataSpace;
+	var f := openFiles();
+
+	sub push(x: intptr) is
+		if sp >= dataSpace + DATA_SIZE then
+			print("Error: program too big.\n");
+			ExitWithError();
+		end if;
+		[sp as [intptr]] := x;
+		sp := sp + @bytesof intptr;
+	end sub;
+
+	sub pop(): (x: intptr) is
+		if sp == dataSpace then
+			print("Error: unmatched ].\n");
+			ExitWithError();
+		end if;
+		sp := sp - @bytesof intptr;
+		x := [sp as [intptr]];		
+	end sub;
+
+	var length := FCBExt(f);
+	var i: intptr := 0;
+	while length > 0 loop
+		var c := FCBGetChar(f);
+		length := length - 1;
+		case c is
+		when '>':
+			pushDS(codeSpace, I_INCP);
+		when '<':
+			pushDS(codeSpace, I_DECP);
+		when '+':
+			pushDS(codeSpace, I_INCD);
+		when '-':
+			pushDS(codeSpace, I_DECD);
+		when '.':
+			pushDS(codeSpace, I_OUT);
+		when ',':
+			pushDS(codeSpace, I_IN);
+		when '[':
+			pushDS(codeSpace, I_JMPF);
+			push(codeSpace.length); #points to space after [
+			i := @bytesof intptr;
+			while i > 0 loop
+				pushDS(codeSpace, 0); #fill that space
+				i := i - 1;
+			end loop;
+		when ']':
+			pushDS(codeSpace, I_JMPB);
+			var jmpbLocation := codeSpace.length; #space after ]
+			var jmpfLocation := pop(); #space after [
+			i := @bytesof intptr;
+			while i > 0 loop
+				pushDS(codeSpace, 0); #fill that space
+				i := i - 1;
+			end loop;
+			#set it so [ + 1 points to ] + 5, and that
+			#] + 1 now points to [ + 5.
+			var pf := (codeSpace.buffer + jmpfLocation) as [intptr];
+			var pb := (codeSpace.buffer + jmpbLocation) as [intptr];
+			[pf] := jmpbLocation + @bytesof intptr;
+			[pb] := jmpfLocation + @bytesof intptr;
+		when else:
+			; #skip
+		end case;
+	end loop;
+	pushDS(codeSpace, I_BRK);
+	instrP := codeSpace.buffer;
+	if sp != dataSpace then
+		print("Error: unmatched [.\n");
+		ExitWithError();
+	end if;
+	MemZero(dataSpace, DATA_SIZE);
+	Free(f as [uint8]);
+end sub;
+
+interface instr();
+var dispatcher: [instr];
+
+sub printDebugData() is
+	print("\tInstruction pointer: ");
+	print_i32((instrP - codeSpace.buffer) as uint32);
+	print("\n\tData pointer: ");
+	print_i32((dataP - dataSpace) as uint32);
+	print("\n\tData: ");
+	print_i8([dataP]);
+	print_nl();
+end sub;
+
+sub brk implements instr is
+	print("---Program halted---\n");
+	printDebugData();
+	Exit();
+end sub;
+
+sub incP implements instr is
+	dataP := dataP + 1;
+	if dataP < dataSpace or dataP >= dataSpace + DATA_SIZE then
+		print("Error: data pointer out of bounds.\n");
+		printDebugData();
+		ExitWithError();
+	else
+		instrP := instrP + 1;
+	end if;
+end sub;
+
+sub decP implements instr is
+	dataP := dataP - 1;
+	if dataP < dataSpace or dataP >= dataSpace + DATA_SIZE then
+		print("Error: data pointer out of bounds.\n");
+		printDebugData();
+		ExitWithError();
+	else
+		instrP := instrP + 1;
+	end if;
+end sub;
+
+sub incD implements instr is
+	[dataP] := [dataP] + 1;
+	instrP := instrP + 1;
+end sub;
+
+sub decD implements instr is
+	[dataP] := [dataP] - 1;
+	instrP := instrP + 1;	
+end sub;
+
+sub out implements instr is
+	print_char([dataP]);
+	instrP := instrP + 1;
+end sub;
+
+sub in implements instr is
+	if inputLength > 0 then
+		[dataP] := FCBGetChar(&input);
+		inputLength := inputLength - 1;
+	end if;
+	instrP := instrP + 1;
+end sub;
+
+sub jmpF implements instr is
+	instrP := instrP + 1;
+	var offset := [instrP as [intptr]];
+	if [dataP] != 0 then
+		instrP := instrP + @bytesof intptr;
+	else
+		instrP := codeSpace.buffer + offset;
+	end if;
+end sub;
+
+sub jmpB implements instr is
+	instrP := instrP + 1;
+	var offset := [instrP as [intptr]];
+	if [dataP] != 0 then
+		instrP := codeSpace.buffer + offset;
+	else
+		instrP := instrP + @bytesof intptr;
+	end if;
+end sub;
+
+
+var instrTable: instr[] := {
+	brk, #end of program space
+	incP,
+	decP,
+	incD,
+	decD,
+	out,
+	in,
+	jmpF,
+	jmpB
+};
+
+dispatcher := &instrTable[0];
+loadProgram();
+
+loop
+	var x := [dispatcher + [instrP] as intptr];
+	x();
+end loop;
